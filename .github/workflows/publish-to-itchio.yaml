@@ -10,9 +10,9 @@ jobs:
         id: download-windows
         uses: dsaltares/fetch-gh-release-asset@master
         with:
+          version: "latest"
           file: circle-jump-windows.zip
-        env:
-          GITHUB_TOKEN: "${{ secrets.GH_CREDENTIALS }}"
+          token: "${{ secrets.GH_CREDENTIALS }}"
       - name: deploy to itch.io (Windows)
         uses: josephbmanley/butler-publish-itchio-action@master
         env:
@@ -22,3 +22,60 @@ jobs:
           ITCH_USER: palmalcheg
           PACKAGE: circle-jump-windows.zip
           VERSION: ${{ steps.download-windows.outputs.version }}
+  release_macos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: download MacOS
+        id: download-macos
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          version: "latest"
+          file: circle-jump-macos.zip
+          token: "${{ secrets.GH_CREDENTIALS }}"
+      - name: deploy to itch.io (MacOS)
+        uses: josephbmanley/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: mac
+          ITCH_GAME: circle-jump
+          ITCH_USER: palmalcheg
+          PACKAGE: circle-jump-macos.zip
+          VERSION: ${{ steps.download-macos.outputs.version }}
+  release_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: download Linux
+        id: download-linux
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          version: "latest"
+          file: circle-jump-linux.zip
+          token: "${{ secrets.GH_CREDENTIALS }}"
+      - name: deploy to itch.io (Linux)
+        uses: josephbmanley/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: linux
+          ITCH_GAME: circle-jump
+          ITCH_USER: palmalcheg
+          PACKAGE: circle-jump-linux.zip
+          VERSION: ${{ steps.download-linux.outputs.version }}
+  release_html:
+    runs-on: ubuntu-latest
+    steps:
+      - name: download HTML5
+        id: download-html
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          version: "latest"
+          file: circle-jump-html.zip
+          token: "${{ secrets.GH_CREDENTIALS }}"
+      - name: deploy to itch.io (HTML5)
+        uses: josephbmanley/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: html
+          ITCH_GAME: circle-jump
+          ITCH_USER: palmalcheg
+          PACKAGE: circle-jump-html.zip
+          VERSION: ${{ steps.download-html.outputs.version }}
