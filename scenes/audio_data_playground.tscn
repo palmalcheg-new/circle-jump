@@ -1,0 +1,335 @@
+[gd_scene load_steps=12 format=2]
+
+[ext_resource path="res://scenes/audio_data_playground.gd" type="Script" id=1]
+[ext_resource path="res://assets/audio/Electronebulae.mp3" type="AudioStream" id=2]
+
+[sub_resource type="Shader" id=1]
+code = "shader_type particles;
+
+uniform vec2 window_size;
+uniform float initial_velocity;
+
+uniform sampler2D tex;
+uniform sampler2D audio_data_tex;
+uniform float beat_freq = 0.6;
+
+const float scale = 5.0;
+const float dist_threshold = 10.0;
+
+float rand_from_seed(in uint seed) {
+  int k;
+  int s = int(seed);
+  if (s == 0)
+    s = 305420679;
+  k = s / 127773;
+  s = 16807 * (s - k * 127773) - 2836 * k;
+  if (s < 0)
+    s += 2147483647;
+  seed = uint(s);
+  return float(seed % uint(65536)) / 65535.0;
+}
+
+uint hash(uint x) {
+  x = ((x >> uint(16)) ^ x) * uint(73244475);
+  x = ((x >> uint(16)) ^ x) * uint(73244475);
+  x = (x >> uint(16)) ^ x;
+  return x;
+}
+
+void vertex() {
+  if (RESTART) {
+	// position
+	TRANSFORM[3].xy = vec2(rand_from_seed(NUMBER) * window_size.x, window_size.y - dist_threshold); 
+	// scale
+	TRANSFORM[0].x = scale;
+	TRANSFORM[1].y = scale;
+	// velocity
+	VELOCITY.xy = 1.0 * vec2(sin(TIME * 134.), 0);
+  } else {
+	
+	vec2 fake_uv = vec2((TRANSFORM[3].x / window_size.x), 0.5);
+	vec4 tex_data = texture(audio_data_tex, fake_uv);
+
+// data from the texture
+	float current_band_power = pow(tex_data.r, 1); 
+	float prev_band_power = pow(tex_data.g, 1); 
+	float total_energy = pow(tex_data.b, 1); 
+
+	float band_power = smoothstep(0.2, 1.5 - pow(fake_uv.x, 3) * 0.5, current_band_power) * 1.; 
+
+	TRANSFORM[3].xy += VELOCITY.xy;
+	
+	if (TRANSFORM[3].y > window_size.y - dist_threshold) {
+//		bounce on the floor
+//		initial_velocity = 255
+		VELOCITY.y = -initial_velocity * band_power;
+		TRANSFORM[3].xy += VELOCITY.xy;
+	} else {
+		VELOCITY.y += 0.09 + (1. - band_power) * 0.9;
+//		strange freeze on abrupt volume change in a band
+		VELOCITY.y *= 1.0 - smoothstep(1.4, 1.41, prev_band_power / current_band_power);
+	}
+	
+	if (TRANSFORM[3].x > window_size.x - dist_threshold || TRANSFORM[3].x < dist_threshold) {
+		VELOCITY.x *= -1.0;
+	} 
+	
+	COLOR.rgb = vec3(0);
+	
+	COLOR.r = clamp(abs(VELOCITY.y / 50.), 0, 1);
+	COLOR.g = clamp(abs(window_size.y - TRANSFORM[3].y)/window_size.y, 0, 1);
+	COLOR.b = 1.0-clamp(abs(window_size.y - TRANSFORM[3].y)/100., 0, 1);
+	
+	vec3 grayscale = vec3(dot(COLOR.rgb, vec3(0.299, 0.587, 0.114)));
+	
+	COLOR.rg *= 4.0;
+	
+//	COLOR.rgb = mix(grayscale*2.0, COLOR.rgb, smoothstep(0., 0.01, current_band_power - total_energy ));
+	
+	// scale
+	TRANSFORM[0].x = scale * (1.0 + band_power);
+	TRANSFORM[1].y = length(VELOCITY) ;
+  }
+} 
+
+
+"
+
+[sub_resource type="ShaderMaterial" id=2]
+shader = SubResource( 1 )
+shader_param/window_size = Vector2( 1000, 600 )
+shader_param/initial_velocity = 255.0
+shader_param/beat_freq = 0.6
+
+[sub_resource type="Environment" id=3]
+background_mode = 4
+glow_enabled = true
+glow_bicubic_upscale = true
+
+[sub_resource type="Shader" id=4]
+code = "shader_type canvas_item;
+
+uniform sampler2D audio_data_tex;
+
+uniform vec4 color1: hint_color;
+uniform vec4 color2: hint_color;
+uniform vec4 color3: hint_color;
+
+
+void fragment(){
+	vec2 uv = vec2(UV.y, UV.x);
+
+	float rows_amount = 100.;
+	float columns_amount = 40.;
+
+	vec2 center_uv = (uv - 0.5) * 2.0 ;
+
+	vec2 wobble = vec2(sin(TIME * 10.  + uv.x * 13.), 0);
+
+	vec2 grid_uv = uv * rows_amount;
+	
+	float row = (floor(grid_uv.y));
+	float column = floor(center_uv.x * rows_amount);
+	
+	float test = smoothstep(0.2, 0.3, fract(grid_uv.y));
+	
+	float row_value = (row) / rows_amount;
+	float column_value = (column) / rows_amount;
+	
+	float dash = smoothstep(0.2, 0.3, fract(grid_uv.x));
+
+//	center_uv.y *= 0.8;
+	
+	vec4 tex_data = texture(audio_data_tex, vec2(row_value, 0));
+
+	float current_band_power = pow(tex_data.r, 1); 
+	float prev_band_power = pow(tex_data.g, 1); 
+	float total_energy = pow(tex_data.b, 1); 
+	
+	float current_band = smoothstep(0.1, 0.2, current_band_power - abs(center_uv.x));
+	float prev_band = smoothstep(0.1, 0.2, (1.0-current_band) * (prev_band_power - abs(center_uv.x)));
+	float energy = (total_energy - current_band);
+	
+	float dashed_band = smoothstep(0.1, 0.5, (abs(column_value) - current_band_power));
+	float dashed_prev_band = smoothstep(0., 0.1, (abs(column_value) - prev_band_power));
+	
+	COLOR.rgb = vec3(0);
+	
+	
+	
+//	COLOR.r = current_band;
+//	COLOR.g = prev_band;
+//	COLOR.b = energy;
+
+	COLOR.rgb = mix(COLOR.rgb, color3.rgb, dashed_band );
+//	COLOR.rgb = mix(COLOR.rgb, color1.rgb, 1.0 - dashed_prev_band);
+//
+	COLOR.rgb *= dash;
+	COLOR.rgb *= test * pow(1.0-abs(center_uv.x), 1);
+	
+//	COLOR.rgb = mix(COLOR.rgb, color2.rgb, 1.0 - test * dash * dashed_prev_band);
+
+	
+}"
+
+[sub_resource type="ShaderMaterial" id=5]
+shader = SubResource( 4 )
+shader_param/color1 = Color( 2.3, 0.1, 0.06, 1 )
+shader_param/color2 = Color( 0.482353, 0.454902, 0.286275, 1 )
+shader_param/color3 = Color( 0, 2.32, 5.59, 1 )
+
+[sub_resource type="Shader" id=6]
+code = "shader_type canvas_item;
+
+uniform sampler2D audio_data_tex;
+uniform sampler2D noise_tex;
+
+uniform float notes_amount;
+
+uniform vec4 color1: hint_color;
+uniform vec4 color2: hint_color;
+uniform vec4 color3: hint_color;
+
+vec2 rotate(vec2 vec, float angle) {
+	float sin_ = sin(angle);
+	float cos_ = cos(angle);
+	return vec * mat2(vec2(sin_, cos_), vec2(cos_, -sin_));
+}
+
+void fragment(){
+	vec4 noise_a = texture(noise_tex, UV + vec2(0, TIME * 0.1));
+	
+	vec4 audio_data = texture(audio_data_tex, vec2(noise_a.r, 0));
+	
+	float current_band_power = pow(audio_data.r, 1); 
+	float prev_band_power = pow(audio_data.g, 1); 
+	float total_energy = pow(audio_data.b, 1);
+	
+	float diff = (current_band_power - prev_band_power);
+
+	
+	vec4 noise = texture(noise_tex, UV + vec2(0, TIME * 0.1 ));
+	
+	float _x = cos(noise.r) * 0.5 + 0.5;
+	float _y = sin(noise.r) * 0.5 + 0.5;
+	
+//	vec4 noise2 = texture(noise_tex, UV + vec2(_x, _y)  );
+//	vec4 noise2 = texture(noise_tex, UV + rotate(vec2(current_band_power), noise.r * 1.4)  );
+	vec4 noise2 = texture(noise_tex, UV + rotate(vec2(_x, _y), noise.r * 1.1)  );
+	
+	_x = cos(noise2.r) * 0.5 + 0.5;
+	_y = sin(noise2.r) * 0.5 + 0.5;
+	
+//	vec4 noise3 = texture(noise_tex, UV + vec2(_x, _y)  );
+//	vec4 noise3 = texture(noise_tex, UV + rotate(vec2(prev_band_power), noise2.r * 0.5)  );
+	vec4 noise3 = texture(noise_tex, UV + rotate(vec2(_x, _y), noise2.r * 0.5)  );
+	
+	COLOR.rgb = vec3(0);
+	float k1 = smoothstep(0.3, 0.1, noise3.r * (1.0-noise.r) );
+	float k2 = smoothstep(0.45, 0.1, noise2.r * 1.0 );
+	float k3 = smoothstep(0.57, 0.99, exp(noise3.r - noise2.r) * 1.5 * current_band_power);
+	
+//	bands 
+
+	vec2 center_uv = (UV.yx - 0.5) * 2.0 ;
+	
+	vec2 grid_uv = UV.yx * notes_amount;
+	
+	float row = (floor(grid_uv.y));
+	float row_value = (row) / notes_amount;
+	
+	float column = floor(center_uv.x * notes_amount * 0.8);
+	float column_value = (column) / notes_amount;
+	
+//	reading texture again - could be optimized
+	vec4 tex_data = texture(audio_data_tex, vec2(row_value, 0));
+	current_band_power = pow(tex_data.r, 1); 
+	float dashed_band = smoothstep(0.3, 0.4, 0.1 + 1.5 * (-abs(column_value) + current_band_power));
+	
+	float dash = smoothstep(0.2, 0.3, fract(grid_uv.x));
+	float test = smoothstep(0.2, 0.3, fract(grid_uv.y));
+	dashed_band *= dash * test * pow(1.0-abs(center_uv.x), 1);
+	
+//	more pixelated bands
+//	dashed_band = smoothstep(0, 0.1, dashed_band);
+	
+// bands end
+	
+	float h = (k2 * (1.0 + prev_band_power * 3.));
+	
+	vec3 normal = vec3(dFdx(h), dFdy(h), 1.0);
+	normal = normalize(normal);
+	
+	vec3 light = normalize(vec3(0.1,0.2,0.1));
+	
+	float d = smoothstep(0.3, 0.9, dot(normal, light));
+	
+	
+	COLOR.rgb = mix(COLOR.rgb, color1.rgb, k1);
+	COLOR.rgb = mix(COLOR.rgb, color2.rgb, d);
+//	COLOR.rgb = mix(COLOR.rgb, color2.rgb * 1.0, k2);
+	
+	COLOR.rgb = mix(COLOR.rgb, color3.rgb * 2.0 * total_energy, k3);
+	COLOR.rgb = mix(COLOR.rgb, color3.rgb * 2.0 * current_band_power, dashed_band);
+	
+		
+	
+}"
+
+[sub_resource type="OpenSimplexNoise" id=7]
+
+[sub_resource type="NoiseTexture" id=8]
+seamless = true
+bump_strength = 1.8
+noise = SubResource( 7 )
+
+[sub_resource type="ShaderMaterial" id=9]
+shader = SubResource( 6 )
+shader_param/notes_amount = 108.0
+shader_param/color1 = Color( 0.113725, 0.180392, 0.231373, 1 )
+shader_param/color2 = Color( 1, 1, 1, 1 )
+shader_param/color3 = Color( 0, 2, 2, 1 )
+shader_param/noise_tex = SubResource( 8 )
+
+[node name="audio_data_playground" type="ColorRect"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color( 0.0980392, 0.0980392, 0.0980392, 1 )
+script = ExtResource( 1 )
+
+[node name="Particles2D" type="Particles2D" parent="."]
+visible = false
+amount = 2000
+lifetime = 10.0
+preprocess = 5.0
+process_material = SubResource( 2 )
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 2 )
+autoplay = true
+
+[node name="TextureRect" type="TextureRect" parent="."]
+visible = false
+anchor_right = 1.0
+margin_bottom = 131.0
+expand = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource( 3 )
+
+[node name="ColorRect" type="ColorRect" parent="."]
+visible = false
+material = SubResource( 5 )
+anchor_right = 1.0
+anchor_bottom = 1.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ColorRect2" type="ColorRect" parent="."]
+material = SubResource( 9 )
+anchor_right = 1.0
+anchor_bottom = 1.0

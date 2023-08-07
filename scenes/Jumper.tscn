@@ -1,0 +1,50 @@
+[gd_scene load_steps=8 format=2]
+
+[ext_resource path="res://scripts/jumper.gd" type="Script" id=1]
+[ext_resource path="res://assets/images/jumper.png" type="Texture" id=2]
+[ext_resource path="res://shaders/color.shader" type="Shader" id=3]
+[ext_resource path="res://assets/audio/88.ogg" type="AudioStream" id=4]
+[ext_resource path="res://assets/audio/70.ogg" type="AudioStream" id=5]
+
+[sub_resource type="ShaderMaterial" id=2]
+shader = ExtResource( 3 )
+shader_param/color = Color( 0.917647, 0.0509804, 0.435294, 1 )
+
+[sub_resource type="Gradient" id=3]
+interpolation_mode = 2
+offsets = PoolRealArray( 0.0810056, 1 )
+colors = PoolColorArray( 0, 0, 0, 0, 0.608989, 0.886719, 0.0599894, 1 )
+
+[node name="Jumper" type="Area2D"]
+script = ExtResource( 1 )
+
+[node name="Sprite" type="Sprite" parent="."]
+material = SubResource( 2 )
+position = Vector2( 0.0282246, 0.0846826 )
+rotation = 1.5708
+scale = Vector2( 0.998306, 1.00056 )
+texture = ExtResource( 2 )
+
+[node name="VisibilityNotifier2D" type="VisibilityNotifier2D" parent="."]
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="."]
+polygon = PoolVector2Array( -21, -21, -21, 21, 20, 0 )
+
+[node name="Trail" type="Node" parent="."]
+
+[node name="Points" type="Line2D" parent="Trail"]
+z_index = -1
+default_color = Color( 0.4, 0.501961, 1, 1 )
+gradient = SubResource( 3 )
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+
+[node name="Jump" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 5 )
+
+[node name="Capture" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 4 )
+
+[connection signal="area_entered" from="." to="." method="_on_Jumper_area_entered"]
+[connection signal="screen_exited" from="VisibilityNotifier2D" to="." method="_on_VisibilityNotifier2D_screen_exited"]
