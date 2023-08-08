@@ -77,5 +77,5 @@ jobs:
           CHANNEL: html
           ITCH_GAME: circle-jump
           ITCH_USER: palmalcheg
-          PACKAGE: circle-jump-html.zip
+          PACKAGE: circle-jump-html5.zip
           VERSION: ${{ steps.download-html.outputs.version }}
