@@ -74,7 +74,7 @@ jobs:
         uses: josephbmanley/butler-publish-itchio-action@master
         env:
           BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-          CHANNEL: html
+          CHANNEL: web
           ITCH_GAME: circle-jump
           ITCH_USER: palmalcheg
           PACKAGE: circle-jump-html5.zip
